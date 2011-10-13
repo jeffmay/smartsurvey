@@ -102,25 +102,29 @@ class SurveyService:
 		pass
 
 	def parseFile(self, path, survey, dialect=csv.Sniffer()):
-        '''Converts a file into a Survey.'''
+        '''Converts a CSV file into a Survey.'''
 		with open(path, 'rb') as file:
 			reader = csv.reader(file, dialect=dialect)
-			self.parseMetaData(reader, survey)
-			self.parseQuestions(reader, survey)
-            #self.parseResponses(reader, survey)
+            self.parse(reader, survey)
 
-	def parseMetaData(self, iterable, survey, maxrows=2):
-		'''Populates CSV header meta data into a Survey.
+    def parse(self, reader, survey):
+        '''Converts an iterable table representation of a survey into a Survey object.'''
+        self._parse_metadata(reader, survey)
+        self._parse_questions(reader, survey)
+        #self._parse_responses(reader, survey)
+
+	def _parse_metadata(self, iterable, survey):
+		'''Populates table header meta data into a Survey.
 
 		Takes only the first cell of the first two rows of the iterable table
 		to be the title and comment respectively.
 
 		'''
-		matrix = take(maxrows, iterable)
+		matrix = take(2, iterable)
 		survey.title = matrix[0][0]
 		survey.comment = matrix[1][0]
 
-	def parseQuestions(self, iterable, survey, maxrows=None):
+	def _parse_questions(self, iterable, survey):
 		'''Populates the colmodel of the survey with column data.'''
 		matrix = table(iterable, maxrows=maxrows)
 		# First parse the answers
@@ -138,14 +142,22 @@ class SurveyService:
 				# Add choice to the current question
 				survey.questions[-1].choices.append(choice)
 
-	def parseResponses(self, iterable, survey, maxrows=None):
-		'''Populates the colmodel of the survey with column data.'''
-		matrix = table(iterable, maxrows=maxrows)
+	def _parse_responses(self, iterable, survey, limit=None):
+		'''Populates the responses of the survey with the remaining rows in the data.'''
+		matrix = table(iterable, maxrows=limit)
 		# Parse all the remaining rows
 		for row in matrix:
 			response = SurveyResponse()
 			# TODO: Need to determine which columns relate to the response meta data
             #       and which are answers.
+
+    # NOTE: The order of arguments is flipped to conserve the chronological order
+    #       of the operation:
+    #
+    #           survey --( dump SQL to )-> file
+    def dump(self, survey, writable):
+        '''Dump a survey as SQL into a writable object, such as a file.'''
+        pass
 
 
 # Views #

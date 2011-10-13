@@ -7,9 +7,15 @@ import argparse
 import csv
 import itertools
 
-from glob import glob
 
-# From a recipe
+# Utility Functions #
+#####################
+
+
+# NOTE: A lot of times, people will create a library of related utilities,
+#       but we'll worry about organizing this later.
+
+# A standard python recipe
 def take(n, iterable):
 	'''Return first n items of the iterable as a list'''
 	return list(itertools.islice(iterable, n))
@@ -27,20 +33,35 @@ def table(iterable, maxrows=None):
 		return take(maxrows, iterable)
 
 
+# Models #
+##########
+
+# NOTE: Many of these models are dependent on the format of the survey data we are using.
+#
+# If we wanted to use this code to convert any CSV into a database, we would have to
+# restructure our models to represent tables, columns, rows, etc.
+#
+# I only put this note here, so you can see how a MVC project might be laid out
+
 class BaseModel:
 	'''A base class for all model classes to inherit from.'''
 	def __str__(self):
+        '''Recursively convert all attributes into a dictionary'''
+        # TODO: Fix this, because it doesn't work
 		return str(dict((str(k), str(v)) for k, v in vars(self).items()))
 
 class SurveyResponse(BaseModel):
 	'''A model of a response in a survey.'''
 	def __init__(self):
-		# TODO: This could be simplified to only store answers to questions
+		# TODO: Decide what meta data we want to store about a response
 		self.id = None
 		self.ip_address = ''
 		self.timestamp = ''
 		self.duplicate = False
 		self.timespent = 0
+        # A map (aka dict) of question ids -> str(answer)
+        # A string is sufficient model for an answer, so we don't need a model class for it
+        self.answers = {}
 
 class SurveyChoice(BaseModel):
 	'''A model of an answer to a single question in a response.'''
@@ -56,7 +77,7 @@ class SurveyQuestion(BaseModel):
 		self.text = ''
 		self.choices = []
 
-class SimpleSurvey(BaseModel):
+class Survey(BaseModel):
 	'''A model to represent a single table survey.'''
 	def __init__(self):
 		self.id = None
@@ -66,22 +87,31 @@ class SimpleSurvey(BaseModel):
 		self.responses = []
 
 
-class SimpleSurveyService:
-	'''Converts files into a SimpleSurvey.
+# Controllers #
+###############
 
-	'''
+# NOTE: Currently there is one controller. We may want to abstract what it is that
+#       a SurveyService does, so that we can have different implementations that
+#       would, for example, persist the Survey to a database rather than just spit
+#       out the SQL commands to construct a database with a single "Response" table.
+
+class SurveyService:
+	'''A service for parsing and populating Surveys'''
+
 	def __init__(self):
 		pass
 
 	def parseFile(self, path, survey, dialect=csv.Sniffer()):
+        '''Converts a file into a Survey.'''
 		with open(path, 'rb') as file:
 			reader = csv.reader(file, dialect=dialect)
 			self.parseMetaData(reader, survey)
 			self.parseQuestions(reader, survey)
+            #self.parseResponses(reader, survey)
 
 	def parseMetaData(self, iterable, survey, maxrows=2):
-		'''Populates CSV header meta data into a SimpleSurvey.
-		
+		'''Populates CSV header meta data into a Survey.
+
 		Takes only the first cell of the first two rows of the iterable table
 		to be the title and comment respectively.
 
@@ -114,18 +144,22 @@ class SimpleSurveyService:
 		# Parse all the remaining rows
 		for row in matrix:
 			response = SurveyResponse()
-			# TODO: Need to differential between response and row
+			# TODO: Need to determine which columns relate to the response meta data
+            #       and which are answers.
 
 
-class SmartSurveyService:
-	'''To implement when Coleman isn't a pussy ass bitch'''
-	pass
+# Views #
+#########
 
+# NOTE: We may at some point want a more interactive experience, that code would go here
 
+# Command Line Interface #
+
+# TODO: Create unit tests instead of running the script each time and reading the debug statements
 def main(args):
 	parser = argparse.ArgumentParser(description='Parse a spreadsheet into a database.')
 	parser.add_argument('files', metavar='N', type=str, nargs='+',
-			            help='the CSV files to convert')
+                        help='the CSV files to convert')
 	parser.add_argument('-d', dest='delim', default=' ',
 						help='the destination file (automatically append .sql)')
 	parser.add_argument('-o', dest='output', action='store_const',
@@ -134,10 +168,14 @@ def main(args):
 	args = parser.parse_args(args)
 
 	surveys = []
-	parser = SimpleSurveyService()
+	parser = SurveyService()
+    # NOTE: I like to put CLI related import statements inside the function,
+    #       so there is no overhead if importing this module into something else
+    #       that does not use the command line main() function.
+    from glob import glob
 	for filename in (filename for path in args.files for filename in glob(path)):
 		print("Creating survey from '%s' ..." % filename)
-		survey = SimpleSurvey()
+		survey = Survey()
 		parser.parseFile(filename, survey)
 		surveys.append(survey)
 	# Now let's see what we got

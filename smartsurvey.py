@@ -126,7 +126,8 @@ class SurveyService:
 
     def _parse_questions(self, iterable, survey):
         '''Populates the colmodel of the survey with column data.'''
-        matrix = table(iterable, maxrows=maxrows)
+        # There are only 2 rows that define the column names (aka the questions)
+        matrix = table(iterable, maxrows=2)
         # First parse the answers
         for i in range(len(matrix[0])):
             if matrix[0][i] != '':

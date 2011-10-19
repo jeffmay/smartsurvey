@@ -47,7 +47,7 @@ class BaseModel:
     '''A base class for all model classes to inherit from.'''
     def __str__(self):
         '''Recursively convert all attributes into a dictionary'''
-        # TODO: Fix this, because it doesn't work
+        # TODO: Fix this, because it doesn't work, wait, I think it does work now.
         return str(dict((str(k), str(v)) for k, v in vars(self).items()))
 
 class SurveyResponse(BaseModel):

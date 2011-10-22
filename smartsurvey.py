@@ -103,8 +103,8 @@ class SurveyService:
 
     def parseFile(self, path, survey, dialect=csv.Sniffer()):
         '''Converts a CSV file into a Survey.'''
-        with open(path, 'rb') as file:
-            reader = csv.reader(file, dialect=dialect)
+        with open(path, 'rb') as f:
+            reader = csv.reader(f, dialect=dialect)
             self.parse(reader, survey)
 
     def parse(self, reader, survey):
@@ -127,9 +127,11 @@ class SurveyService:
     def _parse_questions(self, iterable, survey):
         '''Populates the colmodel of the survey with column data.'''
         # There are only 2 rows that define the column names (aka the questions)
-        matrix = table(iterable, maxrows=2)
+        matrix = take(2, iterable)
         # First parse the answers
-        for i in range(len(matrix[0])):
+        import pdb
+        pdb.set_trace()
+        for i in range(17, len(matrix[0])):
             if matrix[0][i] != '':
                 print("COLUMN: %s" % matrix[0][i])
                 question = SurveyQuestion()

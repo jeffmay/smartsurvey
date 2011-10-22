@@ -169,27 +169,28 @@ class SurveyService:
 # Command Line Interface #
 
 # TODO: Create unit tests instead of running the script each time and reading the debug statements
-def main(args):
+def main(argv):
     parser = argparse.ArgumentParser(description='Parse a spreadsheet into a database.')
-    parser.add_argument('files', metavar='N', type=str, nargs='+',
+    parser.add_argument('files', metavar='files', nargs='+',
                         help='the CSV files to convert')
+    # TODO: Update these to reflect what we are using this for
     parser.add_argument('-d', dest='delim', default=' ',
-                        help='the destination file (automatically append .sql)')
-    parser.add_argument('-o', dest='output', action='store_const',
-                        const=lambda filename: filename if filename.endswith('.sql') else filename + '.sql',
-                        help='the destination file (automatically append .sql)')
-    args = parser.parse_args(args)
+                        help='the delimiter between values on the same row')
+    parser.add_argument('-o', dest='output',
+                        help='the destination sqlite dump file')
+    args = parser.parse_args(argv)
 
     surveys = []
-    parser = SurveyService()
+    surveyService = SurveyService()
     # NOTE: I like to put CLI related import statements inside the function,
     #       so there is no overhead if importing this module into something else
     #       that does not use the command line main() function.
     from glob import glob
+
     for filename in (filename for path in args.files for filename in glob(path)):
         print("Creating survey from '%s' ..." % filename)
         survey = Survey()
-        parser.parseFile(filename, survey)
+        surveyService.parseFile(filename, survey)
         surveys.append(survey)
     # Now let's see what we got
     print("Resulting survey objects:")

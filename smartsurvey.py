@@ -43,12 +43,34 @@ def table(iterable, maxrows=None):
 #
 # I only put this note here, so you can see how a MVC project might be laid out
 
-class BaseModel:
+# I got this from stack exchange to make printing a survey nicer:
+# http://stackoverflow.com/questions/1036409/recursively-convert-python-object-graph-to-dictionary
+def todict(obj, classkey=None):
+    '''Convert an object graph into a dictionary for reference or printing'''
+    if isinstance(obj, dict):
+        for k in obj.keys():
+            obj[k] = todict(obj[k], classkey)
+        return obj
+    elif hasattr(obj, "__iter__"):
+        return [todict(v, classkey) for v in obj]
+    elif hasattr(obj, "__dict__"):
+        data = dict([(key, todict(value, classkey))
+            for key, value in obj.__dict__.iteritems()
+            if not callable(value) and not key.startswith('_')])
+        if classkey is not None and hasattr(obj, "__class__"):
+            data[classkey] = obj.__class__.__name__
+        return data
+    else:
+        return obj
+
+class BaseModel(object):
     '''A base class for all model classes to inherit from.'''
     def __str__(self):
         '''Recursively convert all attributes into a dictionary'''
-        # TODO: Fix this, because it doesn't work, wait, I think it does work now.
-        return str(dict((str(k), str(v)) for k, v in vars(self).items()))
+        import pprint
+        return pprint.pformat(self.todict())
+    def todict(self):
+        return todict(self)
 
 class SurveyResponse(BaseModel):
     '''A model of a response in a survey.'''
@@ -71,9 +93,14 @@ class SurveyChoice(BaseModel):
 
 class SurveyQuestion(BaseModel):
     '''A model of a question in a survey.'''
+
+    MULTIPLE_CHOICE     = 'multiple choice'
+    CHECKBOX_LIST       = 'checkbox list'
+    DROPDOWN_FREETEXT   = 'dropdown with freetext other'
+
     def __init__(self):
         self.id = None
-        self.type = ''
+        self.type = None
         self.text = ''
         self.choices = []
 
@@ -120,6 +147,7 @@ class SurveyService:
         to be the title and comment respectively.
 
         '''
+        # There are only 2 rows that define the meta data for the survey
         matrix = take(2, iterable)
         survey.title = matrix[0][0]
         survey.comment = matrix[1][0]
@@ -128,21 +156,29 @@ class SurveyService:
         '''Populates the colmodel of the survey with column data.'''
         # There are only 2 rows that define the column names (aka the questions)
         matrix = take(2, iterable)
-        # First parse the answers
-        import pdb
-        pdb.set_trace()
+        # First parse the answer choices
         for i in range(17, len(matrix[0])):
+            question_column = False
             if matrix[0][i] != '':
-                print("COLUMN: %s" % matrix[0][i])
+                question_column = True
                 question = SurveyQuestion()
                 question.text = matrix[0][i]
+                # We'll assume multiple choice unless we detect a choice
+                question.type = SurveyQuestion.MULTIPLE_CHOICE
                 survey.questions.append(question)
-                # Increment the current question index
             if matrix[1][i] != '':
-                print("CHOICE: %s" % matrix[1][i])
+                if question_column:
+                    # There is a question in this column
+                    survey.questions[-1].type = SurveyQuestion.CHECKBOX_LIST
+                elif survey.questions[-1].type is not SurveyQuestion.CHECKBOX_LIST:
+                    # There is NO question in this column
+                    # There was NO choice in the same column as the question
+                    assert matrix[1][i].lower() == 'other'
+                    survey.questions[-1].type = SurveyQuestion.DROPDOWN_FREETEXT
+                    # TODO: Do we need the 'other' choice?
+                    continue
                 choice = SurveyChoice()
                 choice.text = matrix[1][i]
-                # Add choice to the current question
                 survey.questions[-1].choices.append(choice)
 
     def _parse_responses(self, iterable, survey, limit=None):
@@ -196,8 +232,7 @@ def main(argv):
         surveys.append(survey)
     # Now let's see what we got
     print("Resulting survey objects:")
-    for s in surveys:
-        print(str(s))
+    print(surveys[0])
 
 
 if __name__ == '__main__':

@@ -33,16 +33,6 @@ def table(iterable, maxrows=None):
         return take(maxrows, iterable)
 
 
-# Models #
-##########
-
-# NOTE: Many of these models are dependent on the format of the survey data we are using.
-#
-# If we wanted to use this code to convert any CSV into a database, we would have to
-# restructure our models to represent tables, columns, rows, etc.
-#
-# I only put this note here, so you can see how a MVC project might be laid out
-
 # I got this from stack exchange to make printing a survey nicer:
 # http://stackoverflow.com/questions/1036409/recursively-convert-python-object-graph-to-dictionary
 def todict(obj, classkey=None):
@@ -62,6 +52,31 @@ def todict(obj, classkey=None):
         return data
     else:
         return obj
+
+
+def optmap(opts, flags):
+    '''
+    Return the dict that contains only the values from opts that map to True in flags.
+
+    >>> optmap({"a": "prop value"}, {"a": True})
+    {'a': 'prop value'}
+    >>> optmap({"a": "prop value", "b": "unnecessary value"}, {"a": True})
+    {'a': 'prop value'}
+    >>> optmap({"a": "prop value"}, {"b": True})
+    {}
+
+    '''
+    return dict([(k,v) for k,v in opts if flags[k] is True])
+
+# Models #
+##########
+
+# NOTE: Many of these models are dependent on the format of the survey data we are using.
+#
+# If we wanted to use this code to convert any CSV into a database, we would have to
+# restructure our models to represent tables, columns, rows, etc.
+#
+# I only put this note here, so you can see how a MVC project might be laid out
 
 class BaseModel(object):
     '''A base class for all model classes to inherit from.'''
@@ -197,6 +212,66 @@ class SurveyService:
     def dump(self, survey, writable):
         '''Dump a survey as SQL into a writable object, such as a file.'''
         pass
+
+    def build(self, survey, builder=SqliteBuilder()):
+        self._build_questions(survey, builder=builder)
+
+    def _build_question(self, survey, builder):
+        id_col = builder.column_def('id', type=SqliteBuilder.INT, primarykey=True)
+        type_col = builder.column_def('type')
+
+
+class SQLSyntaxError(Exception):
+    pass
+
+import sqlite3
+class SqliteBuilder(object):
+
+    def __init__(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.__create_table_opts = {
+                'ifnotexists': " if not exist",
+                }
+        # TODO: Define this when needed
+        self.__column_constraint_opts = {
+                }
+
+    def create_table(self, name, cols, **kwargs):
+        '''Return the SQL statement to create a table with the given name and column_defs.
+
+        Options include:
+            ifnotexists = True
+        
+        '''
+        flags = {'ifnotexists': True}
+        flags.update(kwargs)
+        return  """
+                create table{ifnotexists} {tablename} ({column_defs})
+                """.format(**optmap(self.__create_table_vals, flags) + {
+                    'tablename': name,
+                    'column_defs': cols
+                    })
+
+    def column_def(self, name, type, constraint=None, **kwargs):
+        '''Return the SQL statement to create a column_def with a given name, type and constraint.
+        
+        '''
+        constraint = self.column_constraint() if constraint is None else constraint
+        return  """
+                {col_name} {type_name}{column_constraint}
+                """.format({
+                    'col_name': name,
+                    'type_name': type,
+                    'column_constraint': constraint,
+                    })
+
+    def column_constraint(self, **kwargs):
+        '''
+        '''
+        if kwargs['autoinc'] and not kwargs['primarykey']:
+            raise SQLSyntaxError("Creating an autoincrement constraint on a non-primarykey column")
+        # TODO: Make this do more than add primary keys
+        return  "{primarykey}{autoinc}"
 
 
 # Views #
